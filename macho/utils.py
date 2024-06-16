@@ -4,8 +4,9 @@ from struct import unpack, pack
 from typing import Any, List
 
 
-def readStruct(fmt: str, struct: Any, data: bytes) -> Any:
-    return struct(*unpack(fmt, data))
+def readStruct(offset: int, fmt: str, size: int, struct: Any, data: bytes) -> Any:
+    buffer = data[offset:offset+size]
+    return struct(*unpack(fmt, buffer))
 
 
 def structToBytes(fmt: str, args: tuple) -> bytes:

@@ -16,7 +16,6 @@ class MachoHeader:
     sizeofcmds: int
     flags: int
 
-
 @dataclass
 class LoadCommand:
     # '<2I'
@@ -106,11 +105,23 @@ class KModInfo:
 
 @dataclass
 class ThreadCommand:
+    # '<4I68s'
     cmd: int
     cmdsize: int
     flavor: int
     count: int
     state: bytes
+
+
+@dataclass
+class RelocationInfo:
+    # '<iI'
+    r_address: int
+    r_symbolnum: int  # 24 bits
+    #  r_pcrel: 1 bit
+    #  r_length: 2 bits
+    #  r_extern: 1 bit
+    #  r_type: 4 bits
 
 
 class FileType(Enum):
