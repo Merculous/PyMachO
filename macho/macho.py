@@ -7,7 +7,8 @@ from .types import (
     Section,
     SymTabCommand,
     UUIDCommand,
-    ThreadCommand
+    ThreadCommand,
+    KModInfo
 )
 
 from .utils import readStruct
@@ -18,8 +19,10 @@ class MachO:
 
     def __init__(self, data: bytes) -> None:
         self.data = data
+        self.size = len(self.data)
         self.pos = 0
         self.head = self.parseMacho()
+        self.kexts = self.parseKexts()
 
     def getMachoHeader(self) -> MachoHeader:
         return readStruct(self.pos, '<7I', 28, MachoHeader, self.data)
@@ -44,6 +47,9 @@ class MachO:
 
     def getThreadState(self) -> ThreadCommand:
         return readStruct(self.pos, '<4I68s', 84, ThreadCommand, self.data)
+
+    def getKModInfo(self) -> KModInfo:
+        return readStruct(self.pos, '<I2i64s64si6I', 168, KModInfo, self.data)
 
     def parseMacho(self) -> list:
         cmds = []
@@ -102,4 +108,76 @@ class MachO:
             if self.pos != lCmdEndPos:
                 raise ValueError('Failed reading the correct amount of data!')
 
-        return cmds
+        return [machoHeader, cmds]
+
+    def getSegmentWithName(self, name: bytes, cmds: list) -> SegmentCommand:
+        segCmd = None
+
+        for cmd in cmds:
+            if not isinstance(cmd, list):
+                continue
+
+            seg = cmd[0]
+            segName = seg.segname.translate(None, b'\x00')
+
+            if segName != name:
+                continue
+
+            segCmd = seg
+            break
+
+        if segCmd is None:
+            raise ValueError(f'Could not segment with name {name}!')
+
+        return segCmd
+
+    def parseKexts(self) -> list:
+        headCmds = self.head[1]
+
+        prelink_text = self.getSegmentWithName(b'__PRELINK_TEXT', headCmds)
+        kextStart = prelink_text.fileoff
+        kextEnd = kextStart + prelink_text.filesize
+
+        self.pos = kextStart
+
+        kexts = []
+
+        while self.pos != kextEnd and self.pos <= self.size:
+            kextHeader, kextCmds = self.parseMacho()
+            self.pos -= self.pos - kextStart
+
+            # kModInfo lives at kextStart + __DATA.__data.fileoff
+            # 0x288000 + 0x26000 = 0x2ae000 roughly...
+
+            kextDataSeg = self.getSegmentWithName(b'__DATA', kextCmds)
+            dataSegStart = self.pos + kextDataSeg.fileoff
+
+            kModInfoData = self.data[dataSegStart:dataSegStart+kextDataSeg.filesize]
+            kModPos = kModInfoData.find(b'com.')
+
+            if kModPos == -1:
+                # FIXME I don't like how I'm doing this, at least naming wise.
+                # I don't know if other kexts start without "com." like so,
+                # but this is temporary for now.
+                kModSeatbeltPos = kModInfoData.find(b'security.mac_seatbelt')
+
+                if kModSeatbeltPos == -1:
+                    raise ValueError('Could not find kModInfo!')
+
+                kModPos = kModSeatbeltPos
+
+            kModInfoStart = dataSegStart + kModPos - 12
+            self.pos = kModInfoStart
+
+            kMod = self.getKModInfo()
+
+            if kModPos > 12:
+                self.pos -= kModPos - 12
+
+            self.pos -= kextDataSeg.fileoff
+            self.pos += kMod.size
+            kextStart = self.pos
+
+            kexts.append([kextHeader, kMod, kextCmds])
+
+        return kexts
