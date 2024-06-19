@@ -195,4 +195,11 @@ class MachO:
         return [prelinkInfoPlist, kexts]
 
     def getKextNames(self) -> list:
-        return [kext[1].name.translate(None, b'\x00') for kext in self.kexts]
+        return [kext[1].name.translate(None, b'\x00') for kext in self.kexts[1]]
+
+    def printKextNames(self) -> None:
+        names = sorted(self.getKextNames())
+        kextCount = len(names)
+
+        for i, name in enumerate(names, 1):
+            print(f'[{i}/{kextCount}]: {name}')
