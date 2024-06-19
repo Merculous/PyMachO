@@ -11,6 +11,7 @@ from .types import (
     KModInfo
 )
 
+from .kplist import kplist_parse
 from .utils import readStruct
 
 
@@ -134,9 +135,9 @@ class MachO:
     def parseKexts(self) -> list:
         headCmds = self.head[1]
 
-        prelink_text = self.getSegmentWithName(b'__PRELINK_TEXT', headCmds)
-        kextStart = prelink_text.fileoff
-        kextEnd = kextStart + prelink_text.filesize
+        prelinkText = self.getSegmentWithName(b'__PRELINK_TEXT', headCmds)
+        kextStart = prelinkText.fileoff
+        kextEnd = kextStart + prelinkText.filesize
 
         self.pos = kextStart
 
@@ -180,4 +181,18 @@ class MachO:
 
             kexts.append([kextHeader, kMod, kextCmds])
 
-        return kexts
+        prelinkInfo = self.getSegmentWithName(b'__PRELINK_INFO', headCmds)
+
+        if self.pos != prelinkInfo.fileoff:
+            raise ValueError('Current position does not match PRELINK_INFO!')
+
+        prelinkInfoData = self.data[prelinkInfo.fileoff:prelinkInfo.fileoff+prelinkInfo.filesize]
+        infoEndBuff = prelinkInfoData[-200:]  # FIXME This is sucky
+
+        prelinkInfoData = prelinkInfoData.replace(infoEndBuff, infoEndBuff.translate(None, b'\x00'))
+        prelinkInfoPlist = kplist_parse(prelinkInfoData)
+
+        return [prelinkInfoPlist, kexts]
+
+    def getKextNames(self) -> list:
+        return [kext[1].name.translate(None, b'\x00') for kext in self.kexts]
