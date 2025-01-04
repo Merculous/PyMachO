@@ -124,6 +124,57 @@ class RelocationInfo:
     #  r_type: 4 bits
 
 
+@dataclass
+class DSYMTabCommand:
+    # '<20I'
+    cmd: int
+    cmdsize: int
+    ilocalsym: int
+    nlocalsym: int
+    iextdefsym: int
+    nextdefsym: int
+    iundefsym: int
+    nundefsym: int
+    tocoff: int
+    ntoc: int
+    modtaboff: int
+    nmodtab: int
+    extrefsymoff: int
+    nextrefsyms: int
+    indirectsymoff: int
+    nindirectsyms: int
+    extreloff: int
+    nextrel: int
+    locreloff: int
+    nlocrel: int
+
+
+@dataclass
+class VersionMinCommand:
+    # '<4I'
+    cmd: int
+    cmdsize: int
+    version: int
+    sdk: int
+
+
+@dataclass
+class SourceVersionCommand:
+    # '<2IQ'
+    cmd: int
+    cmdsize: int
+    version: int
+
+
+@dataclass
+class LinkEditDataCommand:
+    # '<4I'
+    cmd: int
+    cmdsize: int
+    dataoff: int
+    datasize: int
+
+
 class FileType(Enum):
     MH_OBJECT = 0x1
     MH_EXECUTE = 0x2

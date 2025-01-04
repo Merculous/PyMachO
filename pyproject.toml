@@ -3,7 +3,6 @@ name = "pymacho"
 version = "1.0"
 description = ""
 authors = ["Merculous <24739823+Merculous@users.noreply.github.com>"]
-license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
