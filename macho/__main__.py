@@ -13,14 +13,15 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if not args.i or not args.kextNames:
+        return parser.print_help()
+
     if args.i:
         input_data = readBinaryFileAtPath(args.i[0])
         macho = MachO(input_data)
 
         if args.kextNames:
             return macho.printKextNames()
-
-        pass
 
 
 if __name__ == '__main__':

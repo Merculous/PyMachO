@@ -1,21 +1,11 @@
 
-from .types import (
-    LoadCommand,
-    MachoHeader,
-    Command,
-    SegmentCommand,
-    Section,
-    SymTabCommand,
-    UUIDCommand,
-    ThreadCommand,
-    KModInfo,
-    DSYMTabCommand,
-    VersionMinCommand,
-    SourceVersionCommand,
-    LinkEditDataCommand
-)
+from sympy import EX
 
 from .kplist import kplist_parse
+from .types import (Command, DSYMTabCommand, KModInfo, LinkEditDataCommand,
+                    LoadCommand, MachoHeader, Section, SegmentCommand,
+                    SourceVersionCommand, SymTabCommand, ThreadCommand,
+                    UUIDCommand, VersionMinCommand)
 from .utils import readStruct
 
 
@@ -151,14 +141,85 @@ class MachO:
 
         return [machoHeader, cmds]
 
-    def getKmodInfoOffset(self) -> None:
-        pass
-
     def parseKexts(self) -> None:
-        pass
+        kexts = []
+        head, cmds = self.head
+
+        for cmd in cmds:
+            if not isinstance(cmd, list):
+                continue
+
+            seg, sects = cmd
+            segname = seg.segname.translate(None, b'\x00')
+
+            if segname != b'__PRELINK_TEXT':
+                continue
+
+            break
+
+        kextStart = seg.fileoff
+        kextEnd = kextStart + seg.filesize
+        kextNext = kextStart
+
+        self.kextStart = kextStart
+        self.kextEnd = kextEnd
+
+        self.pos = kextStart
+
+        while self.pos in range(kextStart, kextEnd):
+            kextHead, kextCmds = self.parseMacho()
+
+            for cmd in kextCmds:
+                if not isinstance(cmd, list):
+                    continue
+
+                seg, sects = cmd
+                segname = seg.segname.translate(None, b'\x00')
+
+                if segname != b'__DATA':
+                    continue
+
+                kextNext += seg.fileoff + seg.filesize
+                self.pos = kextNext
+
+                kexts.append([kextHead, kextCmds])
+
+        return kexts
 
     def getKextNames(self) -> list:
-        return [kext[1].name.translate(None, b'\x00') for kext in self.kexts[1]]
+        self.pos = self.kextStart
+        names = []
+
+        for head, cmds in self.kexts:
+            for cmd in cmds:
+                if not isinstance(cmd, list):
+                    continue
+
+                seg, sects = cmd
+                segname = seg.segname.translate(None, b'\x00')
+
+                if segname != b'__DATA':
+                    continue
+            
+                magic = b'\x00\x00\x00\x00\x01\x00\x00\x00\xff\xff\xff\xff'
+                magicOffset = self.data.find(magic, self.pos)
+
+                if self.pos not in range(self.kextStart, self.kextEnd):
+                    break
+
+                if magicOffset == -1:
+                    raise Exception('Failed to find start of KModInfo!')
+
+                self.pos = magicOffset
+
+                kModInfo = self.getKModInfo()
+                kModName = kModInfo.name.translate(None, b'\x00')
+
+                names.append(kModName)
+
+                self.pos += seg.filesize
+
+        return names
 
     def printKextNames(self) -> None:
         names = sorted(self.getKextNames())
