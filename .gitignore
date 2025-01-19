@@ -4,3 +4,4 @@ venv
 *.bin
 *.kext
 *.txt
+dist
